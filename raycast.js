@@ -1,4 +1,4 @@
-const TILE_SIZE = 32;
+const TILE_SIZE = 64;
 const MAP_NUM_ROWS = 11;
 const MAP_NUM_COLS = 15;
 
@@ -76,27 +76,124 @@ class Player {
         noStroke();
         fill("red");
         circle(this.x, this.y, this.radius);
-        stroke("red");
-        line(
-            this.x,
-            this.y,
-            this.x + Math.cos(this.rotationAngle) * 30,
-            this.y + Math.sin(this.rotationAngle) * 30
-        );
+        // stroke("red");
+        // line(
+        //     this.x,
+        //     this.y,
+        //     this.x + Math.cos(this.rotationAngle) * 30,
+        //     this.y + Math.sin(this.rotationAngle) * 30
+        // );
     }
 }
 
 class Ray {
     constructor(rayAngle){
-        this.rayAngle = rayAngle;
+        //nomalizeAngle : 각도를 0~2pi까지만 가지도록 함
+        this.rayAngle = nomalizeAngle(rayAngle);
+        this.wallHitX = 0;
+        this.wallHitY = 0;
+        this.distance = 0;
+        this.wasHitVertical = false;
+
+        this.isRayFacingDown = this.rayAngle > 0 && this.rayAngle < Math.PI;
+        this.isRayFacingUp = !this.isRayFacingDown;
+
+        this.isRayFacingRight = this.rayAngle < 0.5 * Math.PI || this.rayAngle > 1.5 * Math.PI;
+        this.isRayFacingLeft = !this.isRayFacingRight;
+    }
+    cast(columId){
+        let xintercept;
+        let yintercept;
+        let xstep;
+        let ystep;
+        /* HORIZONTAL RAY-GRID INTERSECTION CODE*/
+        let foundHorzWallHit = false;
+        let horzWallHitX = 0;
+        let horzWallHitY = 0;
+        // 플레이어가 바라보는 방향으로 광선을 캐스팅할 떄 가장 먼저 만나는 수평선의 x,y좌표
+        yintercept = Math.floor(player.y / TILE_SIZE) * TILE_SIZE;
+        yintercept += this.isRayFacingDown ? TILE_SIZE : 0;
+        xintercept = player.x + (yintercept - player.y) / Math.tan(this.rayAngle);
+
+        //xstpe(델타x), ystep(델타y) 계산
+        ystep = TILE_SIZE;
+        ystep *= this.isRayFacingUp ? -1 : 1;
+
+        xstep = TILE_SIZE / Math.tan(this.rayAngle);
+        xstep *= (this.isRayFacingLeft && xstep > 0) ? -1 : 1;
+        xstep *= (this.isRayFacingRight && xstep < 0) ? -1 : 1;
+
+        let nextHorzTouchX = xintercept;
+        let nextHorzTouchY = yintercept;
+
+        if(this.isRayFacingUp){
+            nextHorzTouchY--;
+        }
+
+        while (nextHorzTouchX >= 0 && nextHorzTouchX <= WINDOW_WIDTH && nextHorzTouchY >= 0 && nextHorzTouchY <= WINDOW_HEIGHT) {
+            if (grid.hasWallAt(nextHorzTouchX, nextHorzTouchY)) {
+                foundHorzWallHit = true;
+                horzWallHitX = nextHorzTouchX;
+                horzWallHitY = nextHorzTouchY;
+                break;
+            } else {
+                nextHorzTouchX += xstep;
+                nextHorzTouchY += ystep;
+            }
+        }
+
+        /* VERTICAL RAY-GRID INTERSECTION CODE*/
+        let foundVertwallHit = false;
+        let vertWallHitX = 0;
+        let vertWallHitY = 0;
+        // 플레이어가 바라보는 방향으로 광선을 캐스팅할 떄 가장 먼저 만나는 수직선의 x,y좌표
+        xintercept = Math.floor(player.x / TILE_SIZE) * TILE_SIZE;
+        xintercept += this.isRayFacingRight ? TILE_SIZE : 0;
+        yintercept = player.y + (xintercept - player.x) * Math.tan(this.rayAngle);
+
+        //xstpe(델타x), ystep(델타y) 계산
+        xstep = TILE_SIZE;
+        xstep *= this.isRayFacingLeft ? -1 : 1;
+
+        ystep = TILE_SIZE * Math.tan(this.rayAngle);
+        ystep *= (this.isRayFacingUp && ystep > 0) ? -1 : 1;
+        ystep *= (this.isRayFacingDown && ystep < 0) ? -1 : 1;
+
+        let nextVertTouchX = xintercept;
+        let nextVertTouchY = yintercept;
+
+        if(this.isRayFacingLeft){
+            nextVertTouchX--;
+        }
+
+        while (nextVertTouchX >= 0 && nextVertTouchX <= WINDOW_WIDTH && nextVertTouchY >= 0 && nextVertTouchY <= WINDOW_HEIGHT) {
+            if (grid.hasWallAt(nextVertTouchX, nextVertTouchY)) {
+                foundVertwallHit = true;
+                vertWallHitX = nextVertTouchX;
+                vertWallHitY = nextVertTouchY;
+                break;
+            } else {
+                nextVertTouchX += xstep;
+                nextVertTouchY += ystep;
+            }
+        }
+
+        // 수직 수평 방향의 벽과 마주친 거리를 각각 계산해서 가까운 걸로 캐스팅
+        let horzHitDistance = (foundHorzWallHit) ? distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY) : Number.MAX_VALUE;
+        let vertHitDistance = (foundVertwallHit) ? distanceBetweenPoints(player.x, player.y, vertWallHitX, vertWallHitY) : Number.MAX_VALUE;
+
+        this.wallHitX = horzHitDistance < vertHitDistance ? horzWallHitX : vertWallHitX;
+        this.wallHitY = horzHitDistance < vertHitDistance ? horzWallHitY : vertWallHitY;
+        this.distance =  horzHitDistance < vertHitDistance ? horzHitDistance : vertHitDistance;
+        this.wasHitVertical = (vertHitDistance < horzHitDistance);
     }
     render(){
         stroke("yellowgreen")
         line(
             player.x,
             player.y,
-            player.x + Math.cos(this.rayAngle) * 30,
-            player.y + Math.sin(this.rayAngle) * 30
+            this.wallHitX,
+            this.wallHitY
         );
     }
 }
@@ -139,11 +236,23 @@ function castAllRays(){
     //loop all columns casting the rays
     for(let i = 0; i < NUM_RAYS; i++){
         let ray = new Ray(rayAngle);
-        // ray.cast();
+        ray.cast(columId);
         rays.push(ray);
         rayAngle += FOV_ANGLE / NUM_RAYS;
         columId++;
     }
+}
+
+function nomalizeAngle(angle){
+    angle = angle % (2 * Math.PI);
+    if(angle < 0){
+        angle = (2* Math.PI) + angle;
+    }
+    return angle;
+}
+
+function distanceBetweenPoints(x1, y1, x2, y2){
+    return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 }
 
 // initialize all object
