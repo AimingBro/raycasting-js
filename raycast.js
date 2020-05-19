@@ -274,9 +274,12 @@ function render3DProjectedWalls(){
     //플레이어 -> 프로젝션 플레인, 플레이어 -> 실제 벽 위치 : 두 삼각형의 닮음을 이용
     for(let i = 0; i < NUM_RAYS; i++){
         let ray = rays[i];
-        let rayDistance = ray.distance;
+
+        //fish eye 수정
+        let corretWallDistance = ray.distance * Math.cos(ray.rayAngle - player.rotationAngle);
+
         let distanceProjectionPlane = (WINDOW_WIDTH / 2) / Math.tan(FOV_ANGLE / 2);
-        let wallStriptHeight = (TILE_SIZE / rayDistance) * distanceProjectionPlane;
+        let wallStriptHeight = (TILE_SIZE / corretWallDistance) * distanceProjectionPlane;
         fill("rgba(255, 255, 255, 1.0");
         noStroke();
         rect(
