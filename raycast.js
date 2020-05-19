@@ -10,6 +10,8 @@ const FOV_ANGLE = 60 * (Math.PI / 180);
 const WALL_STRIP_WIDTH = 1;
 const NUM_RAYS = WINDOW_WIDTH / WALL_STRIP_WIDTH;
 
+const MINIMAP_SCALE_FACTOR = 0.2;
+
 class Map {
     constructor() {
         this.grid = [
@@ -34,7 +36,14 @@ class Map {
                 let tileY = i * TILE_SIZE;
                 let tileColor = this.grid[i][j] == 1 ? "#222" : "#fff";
                 fill(tileColor)
-                rect(tileX, tileY, TILE_SIZE, TILE_SIZE); //사각형을 titleX, titleY좌표에서 TILE_SIZE*TILE_SIZE만큼 그린다.
+                rect(
+                    ...([
+                        tileX,
+                        tileY,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    ].map((a)=> MINIMAP_SCALE_FACTOR * a))
+                ); //사각형을 titleX, titleY좌표에서 TILE_SIZE*TILE_SIZE만큼 그린다.
             }
         }
     }
@@ -75,14 +84,22 @@ class Player {
     render(){
         noStroke();
         fill("red");
-        circle(this.x, this.y, this.radius);
-        // stroke("red");
-        // line(
-        //     this.x,
-        //     this.y,
-        //     this.x + Math.cos(this.rotationAngle) * 30,
-        //     this.y + Math.sin(this.rotationAngle) * 30
-        // );
+        circle(
+            ...([
+                this.x,
+                this.y,
+                this.radius
+            ].map((a)=> MINIMAP_SCALE_FACTOR * a))
+            );
+        stroke("red");
+        line(
+            ...([
+                this.x,
+                this.y,
+                this.x + Math.cos(this.rotationAngle) * 30,
+                this.y + Math.sin(this.rotationAngle) * 30
+            ].map((a)=> MINIMAP_SCALE_FACTOR * a))
+        );
     }
 }
 
@@ -190,10 +207,12 @@ class Ray {
     render(){
         stroke("yellowgreen")
         line(
-            player.x,
-            player.y,
-            this.wallHitX,
-            this.wallHitY
+            ...[
+                player.x,
+                player.y,
+                this.wallHitX,
+                this.wallHitY
+            ].map(a=>MINIMAP_SCALE_FACTOR * a)
         );
     }
 }
@@ -251,6 +270,24 @@ function nomalizeAngle(angle){
     return angle;
 }
 
+function render3DProjectedWalls(){
+    //플레이어 -> 프로젝션 플레인, 플레이어 -> 실제 벽 위치 : 두 삼각형의 닮음을 이용
+    for(let i = 0; i < NUM_RAYS; i++){
+        let ray = rays[i];
+        let rayDistance = ray.distance;
+        let distanceProjectionPlane = (WINDOW_WIDTH / 2) / Math.tan(FOV_ANGLE / 2);
+        let wallStriptHeight = (TILE_SIZE / rayDistance) * distanceProjectionPlane;
+        fill("rgba(255, 255, 255, 1.0");
+        noStroke();
+        rect(
+            i * WALL_STRIP_WIDTH,
+            (WINDOW_HEIGHT / 2) - (wallStriptHeight / 2),
+            WALL_STRIP_WIDTH,
+            wallStriptHeight
+        );
+    }
+}
+
 function distanceBetweenPoints(x1, y1, x2, y2){
     return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 }
@@ -268,7 +305,11 @@ function update() {
 
 // render all object frame by frame
 function draw() {
+    clear("#212121");
     update();
+
+    render3DProjectedWalls();
+
     grid.render();
     for(ray of rays){
         ray.render();
