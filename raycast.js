@@ -280,7 +280,10 @@ function render3DProjectedWalls(){
 
         let distanceProjectionPlane = (WINDOW_WIDTH / 2) / Math.tan(FOV_ANGLE / 2);
         let wallStriptHeight = (TILE_SIZE / corretWallDistance) * distanceProjectionPlane;
-        fill("rgba(255, 255, 255, 1.0");
+
+        //add the shade (투명도 조정)
+        let alpha = 180 / corretWallDistance;
+        fill(`rgba(255, 255, 255, ${alpha})`);
         noStroke();
         rect(
             i * WALL_STRIP_WIDTH,
