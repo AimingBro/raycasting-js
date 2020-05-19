@@ -10,15 +10,15 @@ const FOV_ANGLE = 60 * (Math.PI / 180);
 const WALL_STRIP_WIDTH = 1;
 const NUM_RAYS = WINDOW_WIDTH / WALL_STRIP_WIDTH;
 
-const MINIMAP_SCALE_FACTOR = 0.2;
+const MINIMAP_SCALE_FACTOR = 0.25;
 
 class Map {
     constructor() {
         this.grid = [
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-            [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
+            [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
             [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
             [1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1],
             [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -27,6 +27,14 @@ class Map {
             [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ];
+    }
+    hasWallAt(x, y){
+        if(x < 0 || x > WINDOW_WIDTH || y < 0 || y > WINDOW_HEIGHT){
+            return true;
+        }
+        const mapGridIndexY = Math.floor(y / TILE_SIZE);
+        const mapGridIndexX = Math.floor(x / TILE_SIZE);
+        return this.grid[mapGridIndexY][mapGridIndexX] === 1;
     }
     render() {
         stroke("#222");
@@ -47,14 +55,6 @@ class Map {
             }
         }
     }
-    hasWallAt(x, y){
-        if(x < 0 || x > WINDOW_WIDTH || y < 0 || y > WINDOW_HEIGHT){
-            return true;
-        }
-        const mapGridIndexY = Math.floor(y / TILE_SIZE);
-        const mapGridIndexX = Math.floor(x / TILE_SIZE);
-        return this.grid[mapGridIndexY][mapGridIndexX] === 1;
-    }
 }
 
 class Player {
@@ -65,8 +65,8 @@ class Player {
         this.turnDirection = 0; // -1 if left, +1 if right
         this.walkDirection = 0; // -1 if back, +1 if front
         this.rotationAngle = Math.PI / 2;
-        this.moveSpeed = 2.0;
-        this.rotationSpeed = 2 * (Math.PI / 180);
+        this.moveSpeed = 4.0;
+        this.rotationSpeed = 3 * (Math.PI / 180);
     }
     update(){
         //update player position & direction
@@ -118,7 +118,7 @@ class Ray {
         this.isRayFacingRight = this.rayAngle < 0.5 * Math.PI || this.rayAngle > 1.5 * Math.PI;
         this.isRayFacingLeft = !this.isRayFacingRight;
     }
-    cast(columId){
+    cast(){
         let xintercept;
         let yintercept;
         let xstep;
@@ -143,12 +143,8 @@ class Ray {
         let nextHorzTouchX = xintercept;
         let nextHorzTouchY = yintercept;
 
-        if(this.isRayFacingUp){
-            nextHorzTouchY--;
-        }
-
         while (nextHorzTouchX >= 0 && nextHorzTouchX <= WINDOW_WIDTH && nextHorzTouchY >= 0 && nextHorzTouchY <= WINDOW_HEIGHT) {
-            if (grid.hasWallAt(nextHorzTouchX, nextHorzTouchY)) {
+            if (grid.hasWallAt(nextHorzTouchX, nextHorzTouchY - (this.isRayFacingUp ? 1 : 0))) {
                 foundHorzWallHit = true;
                 horzWallHitX = nextHorzTouchX;
                 horzWallHitY = nextHorzTouchY;
@@ -179,12 +175,8 @@ class Ray {
         let nextVertTouchX = xintercept;
         let nextVertTouchY = yintercept;
 
-        if(this.isRayFacingLeft){
-            nextVertTouchX--;
-        }
-
         while (nextVertTouchX >= 0 && nextVertTouchX <= WINDOW_WIDTH && nextVertTouchY >= 0 && nextVertTouchY <= WINDOW_HEIGHT) {
-            if (grid.hasWallAt(nextVertTouchX, nextVertTouchY)) {
+            if (grid.hasWallAt(nextVertTouchX - (this.isRayFacingLeft ? 1 : 0), nextVertTouchY)) {
                 foundVertwallHit = true;
                 vertWallHitX = nextVertTouchX;
                 vertWallHitY = nextVertTouchY;
@@ -198,11 +190,17 @@ class Ray {
         // 수직 수평 방향의 벽과 마주친 거리를 각각 계산해서 가까운 걸로 캐스팅
         let horzHitDistance = (foundHorzWallHit) ? distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY) : Number.MAX_VALUE;
         let vertHitDistance = (foundVertwallHit) ? distanceBetweenPoints(player.x, player.y, vertWallHitX, vertWallHitY) : Number.MAX_VALUE;
-
-        this.wallHitX = horzHitDistance < vertHitDistance ? horzWallHitX : vertWallHitX;
-        this.wallHitY = horzHitDistance < vertHitDistance ? horzWallHitY : vertWallHitY;
-        this.distance =  horzHitDistance < vertHitDistance ? horzHitDistance : vertHitDistance;
-        this.wasHitVertical = (vertHitDistance < horzHitDistance);
+        if(horzHitDistance < vertHitDistance){
+            this.wallHitX = horzWallHitX;
+            this.wallHitY = horzWallHitY;
+            this.distance = horzHitDistance;
+            this.wasHitVertical = false;
+        } else {
+            this.wallHitX = vertWallHitX;
+            this.wallHitY = vertWallHitY;
+            this.distance = vertHitDistance;
+            this.wasHitVertical = true;
+        }
     }
     render(){
         stroke("yellowgreen")
@@ -246,19 +244,17 @@ function keyReleased(){
 }
 
 function castAllRays(){
-    let columId = 0;
     //start first ray subtracting half of the FOV
     let rayAngle = player.rotationAngle - (FOV_ANGLE / 2);
 
     rays = [];
 
     //loop all columns casting the rays
-    for(let i = 0; i < NUM_RAYS; i++){
+    for(let col = 0; col < NUM_RAYS; col++){
         let ray = new Ray(rayAngle);
-        ray.cast(columId);
+        ray.cast();
         rays.push(ray);
         rayAngle += FOV_ANGLE / NUM_RAYS;
-        columId++;
     }
 }
 
@@ -282,8 +278,11 @@ function render3DProjectedWalls(){
         let wallStriptHeight = (TILE_SIZE / corretWallDistance) * distanceProjectionPlane;
 
         //add the shade (투명도 조정)
-        let alpha = 180 / corretWallDistance;
-        fill(`rgba(255, 255, 255, ${alpha})`);
+        let alpha = 1.0; // 180 / corretWallDistance;
+        //레이가 닿은 방향에 따라 다른 색을 보여줌
+        let colorIntensity = ray.wasHitVertical ? 255 : 180;
+
+        fill(`rgba(${colorIntensity}, ${colorIntensity}, ${colorIntensity}, ${alpha})`);
         noStroke();
         rect(
             i * WALL_STRIP_WIDTH,
@@ -311,7 +310,7 @@ function update() {
 
 // render all object frame by frame
 function draw() {
-    clear("#212121");
+    clear("#111");
     update();
 
     render3DProjectedWalls();
